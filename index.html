@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Новостройки на Яндекс.Картах</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: row;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+
+        #map {
+            flex: 1;
+            height: 100vh;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #filter {
+            width: 300px; /* Задаем фиксированную ширину для фильтра */
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #info-box {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .filter-label {
+            display: block;
+            margin: 10px 0;
+        }
+
+        h3 {
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            #filter {
+                width: 100%; /* Полная ширина для мобильных */
+                box-shadow: none; /* Убираем тень для фильтра на мобильных */
+            }
+            #map {
+                height: 50vh; /* Высота карты на мобильных */
+            }
+        }
+
+        @media (max-width: 480px) {
+            #info-box {
+                width: 90%; /* Ширина информационного окна */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="info-box"></div>
+    <div id="filter">
+        <h3>Фильтр новостроек</h3>
+        <label class="filter-label">
+            <input type="checkbox" value="КП" onchange="filterApartments()"> КП
+        </label>
+        <label class="filter-label">
+            <input type="checkbox" value="ЖК" onchange="filterApartments()"> ЖК
+        </label>
+        <label class="filter-label">
+            <input type="checkbox" value="ПГТ" onchange="filterApartments()"> ПГТ
+        </label>
+    </div>
+
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU"></script>
+    <script>
+        // Данные о новостройках с координатами и одинаковыми описаниями
+        const commonDescription = `
+            <strong>Отделы продаж:</strong><br>
+            с. Нагаево, Акбердино/Блохино - ул. М. Дорохова 101Х<br>
+            Осоргинский Посад - Осоргино ул. Молодёжная 23<br>
+            Красный Яр - ул. Тополиная 1/1<br><br>
+            <strong>📞 Контакты менеджеров отдела продаж WA:</strong><br>
+            Рудольф +7-917-044-21-12<br>
+            Ришат +7 987 627-09-80<br>
+            Аделина +7-927-351-88-82<br>
+            Артур +7-917-348-69-84<br>
+            Бахтиер +7-927-354-35-88<br><br>
+            <strong>Войдите в чат с застройщиком:</strong><br>
+            📲 Запросить информацию по планировкам и ценам: +7-987-495-26-45<br>
+            👥 Проверка клиента на уникальность и зафиксировать клиента: +7-987-495-26-45<br><br>
+            <strong>Условия агентского вознаграждения:</strong><br>
+            3% - договор подряда<br>
+            100 000 ₽ - готовые дома
+        `;
+
+        const apartments = [
+            {
+                name: "КП Рождественский",
+                coords: [54.682089, 56.188307],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Нагаево Премиум",
+                coords: [54.643113, 56.140627],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Ветерра",
+                coords: [54.581615, 55.796150],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Красный Яр",
+                coords: [54.888684, 55.928781],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Осоргинский посад",
+                coords: [54.561416, 55.754191],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "ПГТ Блохино",
+                coords: [54.592050, 56.234382],
+                description: commonDescription,
+                status: "ПГТ",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "ЖК Лермонтов",
+                coords: [54.864284, 55.737360],
+                description: commonDescription,
+                status: "ЖК",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Красная поляна",
+                coords: [54.591294, 56.235219],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Эковилладж в Шмидтово",
+                coords: [54.626804, 56.205225],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "ЖК Геометрия",
+                coords: [54.648682, 56.123245],
+                description: commonDescription,
+                status: "ЖК",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Эко-вилладж в Нагаево",
+                coords: [54.629383, 56.137842],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Family Park",
+                coords: [54.631473, 56.139339],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            // Новые объекты
+            {
+                name: "ЖК ПортLAND",
+                coords: [54.644671, 56.147221],
+                description: commonDescription,
+                status: "ЖК",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Планета",
+                coords: [54.794129, 55.677474],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Алые Паруса",
+                coords: [54.864031, 55.736565],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Таунпарк Андерсен",
+                coords: [54.752671, 55.729998],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Карповский",
+                coords: [54.680483, 56.131244],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Есененский 2",
+                coords: [54.634620, 56.109321],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Девичья гора",
+                coords: [54.593051, 56.208728],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Елкибаево",
+                coords: [54.692190, 56.091311],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Самохваловка",
+                coords: [54.674992, 56.157503],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Миллениум парк",
+                coords: [54.632088, 56.194134],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Нагаевский парк",
+                coords: [54.624567, 56.169047],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "Ветошниково",
+                coords: [54.746051, 55.802627],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            // Новый объект
+            {
+                name: "ЖК Премьер 2",
+                coords: [54.689201, 55.768868],
+                description: commonDescription,
+                status: "ЖК",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            },
+            {
+                name: "КП Миллениум парк",
+                coords: [54.633859, 56.200634],
+                description: commonDescription,
+                status: "КП",
+                image: "https://via.placeholder.com/150" // Замените на изображение
+            }
+        ];
+
+        let map, placemarks = [];
+
+        ymaps.ready(init);
+
+        function init() {
+            map = new ymaps.Map("map", {
+                center: [54.775272, 56.064735], // Центр карты
+                zoom: 10
+            });
+
+            apartments.forEach(addPlacemark);
+            map.events.add('click', hideInfoBox);
+        }
+
+        function addPlacemark(apartment) {
+            const placemark = new ymaps.Placemark(apartment.coords, {
+                balloonContentHeader: apartment.name,
+                balloonContentBody: `
+                    <div>
+                        <img src="${apartment.image}" alt="${apartment.name}" height="100" width="150" style="border-radius: 8px;">
+                        <p>${apartment.description}</p>
+                    </div>
+                `,
+                balloonContentFooter: apartment.status,
+            }, {
+                preset: 'islands#icon',
+                iconColor: '#0095b6'
+            });
+
+            placemark.events.add('click', () => showInfoBox(apartment));
+            map.geoObjects.add(placemark);
+            placemarks.push({ placemark, status: apartment.status });
+        }
+
+        function showInfoBox(apartment) {
+            const infoBox = document.getElementById('info-box');
+            infoBox.innerHTML = `
+                <strong>${apartment.name}</strong><br>
+                <strong>Адрес:</strong> ${apartment.description}<br>
+            `;
+            infoBox.style.display = 'block';
+        }
+
+        function hideInfoBox() {
+            const infoBox = document.getElementById('info-box');
+            infoBox.style.display = 'none';
+        }
+
+        function filterApartments() {
+            const selectedStatuses = Array.from(document.querySelectorAll('#filter input:checked')).map(input => input.value);
+            placemarks.forEach(({ placemark, status }) => {
+                const isVisible = selectedStatuses.length === 0 || selectedStatuses.includes(status);
+                placemark.options.set('visible', isVisible);
+            });
+        }
+
+        // Закрытие информационного окна при щелчке вне
+        document.addEventListener('click', (event) => {
+            const infoBox = document.getElementById('info-box');
+            if (event.target.closest('#info-box') === null && event.target.closest('.ymaps-2-1-placemark') === null) {
+                infoBox.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
